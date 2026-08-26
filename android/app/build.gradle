@@ -14,8 +14,8 @@ android {
         applicationId 'com.pulsedistrict.music'
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName '1.0.0'
+        versionCode 2
+        versionName '1.0.1'
 
         // Set this to the deployed HTTPS Flask API URL before making a release build.
         buildConfigField 'String', 'API_BASE_URL', '""'
