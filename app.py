@@ -1,11 +1,13 @@
 """
-app.py — JioSaavn API  |  Flask + Vercel Edition
+app.py - JioSaavn API  |  Flask + Vercel Edition
 Credits: @ab_devs
 """
 
 import json
 import re
-from flask import Flask, jsonify, request, make_response
+from pathlib import Path
+
+from flask import Flask, abort, jsonify, request, make_response, send_from_directory
 
 from helpers import jiosaavn_fetch
 from models import (
@@ -20,7 +22,8 @@ from models import (
     build_search_playlists,
 )
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static/assets", static_url_path="/assets")
+STATIC_ROOT = Path(app.root_path) / "static"
 
 
 def _cors(response):
@@ -49,13 +52,27 @@ def err(msg, code=400):
     return jsonify({"success": False, "message": msg}), code
 
 
-# ─── HOME ─────────────────────────────────────────────────────────────────────
+def query_int(name, default, minimum=0, maximum=100):
+    try:
+        value = int(request.args.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(value, maximum))
+
+
+# ─── APP AND API DISCOVERY ───────────────────────────────────────────────────
 
 @app.route("/")
 def home():
+    return send_from_directory(STATIC_ROOT, "index.html")
+
+
+@app.route("/api")
+@app.route("/api/")
+def api_home():
     return jsonify({
         "success": True,
-        "message": "JioSaavn API — Credits: @ab_devs",
+        "message": "Pulse District music API",
         "endpoints": {
             "search":    "/api/search?query=",
             "songs":     "/api/songs?ids=  or  /api/songs?link=",
@@ -67,9 +84,16 @@ def home():
             "search_songs":    "/api/search/songs?query=",
             "search_albums":   "/api/search/albums?query=",
             "search_artists":  "/api/search/artists?query=",
-            "search_playlists":"/api/search/playlists?query=",
-        }
+            "search_playlists": "/api/search/playlists?query=",
+        },
     })
+
+
+@app.route("/<path:client_path>")
+def client_route(client_path):
+    if client_path.startswith("api/"):
+        abort(404)
+    return send_from_directory(STATIC_ROOT, "index.html")
 
 
 # ─── SONGS ────────────────────────────────────────────────────────────────────
@@ -110,7 +134,7 @@ def get_song_by_id(song_id):
 
 @app.route("/api/songs/<song_id>/suggestions")
 def get_song_suggestions(song_id):
-    limit = int(request.args.get("limit", 10))
+    limit = query_int("limit", 10, 1, 50)
 
     # Step 1: create station
     encoded_id = json.dumps([song_id.replace(" ", "%20")])
@@ -173,8 +197,8 @@ def get_album():
 def get_playlist():
     pl_id = request.args.get("id")
     link  = request.args.get("link")
-    page  = int(request.args.get("page", 0))
-    limit = int(request.args.get("limit", 10))
+    page  = query_int("page", 0, 0, 1000)
+    limit = query_int("limit", 10, 1, 50)
 
     if not pl_id and not link:
         return err("Either playlist ID or link is required")
@@ -208,9 +232,9 @@ def get_playlist():
 def get_artist():
     artist_id  = request.args.get("id")
     link       = request.args.get("link")
-    page       = int(request.args.get("page", 0))
-    song_count = int(request.args.get("songCount", 10))
-    album_count= int(request.args.get("albumCount", 10))
+    page       = query_int("page", 0, 0, 1000)
+    song_count = query_int("songCount", 10, 1, 50)
+    album_count= query_int("albumCount", 10, 1, 50)
     sort_by    = request.args.get("sortBy", "popularity")
     sort_order = request.args.get("sortOrder", "desc")
 
@@ -241,9 +265,9 @@ def get_artist():
 
 @app.route("/api/artists/<artist_id>")
 def get_artist_by_id(artist_id):
-    page       = int(request.args.get("page", 0))
-    song_count = int(request.args.get("songCount", 10))
-    album_count= int(request.args.get("albumCount", 10))
+    page       = query_int("page", 0, 0, 1000)
+    song_count = query_int("songCount", 10, 1, 50)
+    album_count= query_int("albumCount", 10, 1, 50)
     sort_by    = request.args.get("sortBy", "popularity")
     sort_order = request.args.get("sortOrder", "desc")
 
@@ -259,7 +283,7 @@ def get_artist_by_id(artist_id):
 
 @app.route("/api/artists/<artist_id>/songs")
 def get_artist_songs(artist_id):
-    page       = int(request.args.get("page", 0))
+    page       = query_int("page", 0, 0, 1000)
     sort_by    = request.args.get("sortBy", "popularity")
     sort_order = request.args.get("sortOrder", "desc")
 
@@ -277,7 +301,7 @@ def get_artist_songs(artist_id):
 
 @app.route("/api/artists/<artist_id>/albums")
 def get_artist_albums(artist_id):
-    page       = int(request.args.get("page", 0))
+    page       = query_int("page", 0, 0, 1000)
     sort_by    = request.args.get("sortBy", "popularity")
     sort_order = request.args.get("sortOrder", "desc")
 
@@ -311,8 +335,8 @@ def search_all():
 @app.route("/api/search/songs")
 def search_songs():
     query = request.args.get("query", "").strip()
-    page  = int(request.args.get("page", 0))
-    limit = int(request.args.get("limit", 10))
+    page  = query_int("page", 0, 0, 1000)
+    limit = query_int("limit", 10, 1, 50)
 
     if not query:
         return err("query parameter is required")
@@ -324,8 +348,8 @@ def search_songs():
 @app.route("/api/search/albums")
 def search_albums():
     query = request.args.get("query", "").strip()
-    page  = int(request.args.get("page", 0))
-    limit = int(request.args.get("limit", 10))
+    page  = query_int("page", 0, 0, 1000)
+    limit = query_int("limit", 10, 1, 50)
 
     if not query:
         return err("query parameter is required")
@@ -337,8 +361,8 @@ def search_albums():
 @app.route("/api/search/artists")
 def search_artists():
     query = request.args.get("query", "").strip()
-    page  = int(request.args.get("page", 0))
-    limit = int(request.args.get("limit", 10))
+    page  = query_int("page", 0, 0, 1000)
+    limit = query_int("limit", 10, 1, 50)
 
     if not query:
         return err("query parameter is required")
@@ -350,8 +374,8 @@ def search_artists():
 @app.route("/api/search/playlists")
 def search_playlists():
     query = request.args.get("query", "").strip()
-    page  = int(request.args.get("page", 0))
-    limit = int(request.args.get("limit", 10))
+    page  = query_int("page", 0, 0, 1000)
+    limit = query_int("limit", 10, 1, 50)
 
     if not query:
         return err("query parameter is required")

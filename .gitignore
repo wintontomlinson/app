@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Node and Vite
+web/node_modules/
+web/*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
+
+# Android and Gradle build intermediates
+android/.gradle/
+android/build/
+android/app/build/intermediates/
+android/app/build/generated/
+android/app/build/outputs/logs/
+
+android/app/build/outputs/
+!android/app/build/outputs/apk/
+!android/app/build/outputs/apk/debug/
+!android/app/build/outputs/apk/debug/app-debug.apk
